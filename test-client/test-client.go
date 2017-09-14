@@ -5,11 +5,25 @@ import (
 	"log"
 	"net"
 
+	"github.com/sammhicks/network-broadcast/config"
 	"github.com/sammhicks/network-broadcast/messages"
 )
 
+type clientConfig struct {
+	Network string
+	Address string
+}
+
 func main() {
-	conn, err := net.Dial("tcp4", "localhost:8080")
+	var conf clientConfig
+
+	err := config.Load(&conf)
+
+	if err != nil {
+		log.Fatalln("Error reading config: ", err)
+	}
+
+	conn, err := net.Dial(conf.Network, conf.Address)
 
 	if err != nil {
 		log.Fatalln("Could not dial: ", err)
