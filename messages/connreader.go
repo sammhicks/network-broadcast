@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-// ReadFromConn reads messages from conn and places sends them to the returned channel
+// ReadFromConn reads messages from conn and sends them to the returned channel
 func ReadFromConn(conn net.Conn) <-chan Message {
 	out := make(chan Message)
 
