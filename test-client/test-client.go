@@ -3,19 +3,37 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"net"
+	"os"
+	"os/signal"
 
-	"github.com/sammhicks/network-broadcast/messages"
+	"github.com/sammhicks/network-broadcast/config"
+	"github.com/sammhicks/network-broadcast/messages/http"
 )
 
+type clientConfig struct {
+	URL string
+}
+
 func main() {
-	conn, err := net.Dial("tcp4", "localhost:8080")
+	var conf clientConfig
+
+	err := config.Load(&conf)
 
 	if err != nil {
-		log.Fatalln("Could not dial: ", err)
+		log.Fatalln("Error reading config: ", err)
 	}
 
-	for m := range messages.ReadFromConn(conn) {
+	done := make(chan struct{})
+
+	go func() {
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, os.Interrupt)
+		<-signals
+		signal.Stop(signals)
+		close(done)
+	}()
+
+	for m := range http.ConnectToPublisher(conf.URL, done) {
 		b, err := json.Marshal(m)
 
 		if err == nil {

@@ -1,27 +1,71 @@
 package messages
 
-import "container/list"
+type element struct {
+	value Message
+	next  *element
+}
+
+type queue struct {
+	frontElem *element
+	backElem  *element
+}
+
+func (q *queue) Empty() bool {
+	return q.frontElem == nil
+}
+
+func (q *queue) Front() Message {
+	if !q.Empty() {
+		return q.frontElem.value
+	}
+	panic("Empty queue has no front!")
+}
+
+func (q *queue) Pop() {
+	if !q.Empty() {
+		q.frontElem = q.frontElem.next
+	}
+}
+
+func (q *queue) Push(m Message) {
+	e := &element{
+		next:  nil,
+		value: m}
+
+	if q.Empty() {
+		q.frontElem = e
+	} else {
+		q.backElem.next = e
+	}
+
+	q.backElem = e
+}
 
 func bufferMessage(in <-chan Message) <-chan Message {
 	out := make(chan Message)
 
-	buffer := list.New()
+	var buffer queue
 
 	go func() {
 		for {
-			if buffer.Len() == 0 {
-				buffer.PushBack(<-in)
+			if buffer.Empty() {
+				buffer.Push(<-in)
 			} else {
 				select {
-				case newMessage, ok := <-in:
+				case m, ok := <-in:
 					if ok {
-						buffer.PushBack(newMessage)
+						buffer.Push(m)
 					} else {
+						for !buffer.Empty() {
+							out <- buffer.Front()
+							buffer.Pop()
+						}
+
 						close(out)
 						return
 					}
-				case out <- buffer.Front().Value.(Message):
-					buffer.Remove(buffer.Front())
+				case out <- buffer.Front():
+					buffer.Pop()
 				}
 			}
 		}
