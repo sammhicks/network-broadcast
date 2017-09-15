@@ -38,7 +38,8 @@ func (sub *subscriber) Unsubscribe() {
 }
 
 func (sub *subscriber) Done() {
-	log.Println("Sub Done")
+	log.Println("Subscriber Done")
+	sub.Unsubscribe()
 	sub.done.Done()
 }
 
@@ -108,7 +109,7 @@ func PublishMessages(messageSrc <-chan Message, pubDone *sync.WaitGroup) Publish
 				pubDone.Add(1)
 				subs[sub] = sub.messages
 			case sub := <-unSubRequest:
-				log.Println("Dead Subscriber")
+				log.Println("Subscriber Unsubscribing")
 				close(sub.messages)
 				delete(subs, sub)
 			}

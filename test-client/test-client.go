@@ -3,15 +3,15 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"net"
+	"os"
+	"os/signal"
 
 	"github.com/sammhicks/network-broadcast/config"
-	"github.com/sammhicks/network-broadcast/messages"
+	"github.com/sammhicks/network-broadcast/messages/http"
 )
 
 type clientConfig struct {
-	Network string
-	Address string
+	URL string
 }
 
 func main() {
@@ -23,13 +23,17 @@ func main() {
 		log.Fatalln("Error reading config: ", err)
 	}
 
-	conn, err := net.Dial(conf.Network, conf.Address)
+	done := make(chan struct{})
 
-	if err != nil {
-		log.Fatalln("Could not dial: ", err)
-	}
+	go func() {
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, os.Interrupt)
+		<-signals
+		signal.Stop(signals)
+		close(done)
+	}()
 
-	for m := range messages.ReadFromConn(conn) {
+	for m := range http.ConnectToPublisher(conf.URL, done) {
 		b, err := json.Marshal(m)
 
 		if err == nil {
