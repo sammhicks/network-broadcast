@@ -6,28 +6,22 @@ import (
 )
 
 // Subscriber subscribes to a Publisher, and has a channel that receives messages
-type Subscriber interface {
-	Messages() <-chan Message
-	Unsubscribe()
-	Done()
-}
-
-type subscriber struct {
+type Subscriber struct {
 	messages    chan Message
-	unSubscribe chan *subscriber
+	unsubscribe chan *Subscriber
 	done        *sync.WaitGroup
 }
 
-// MessageChannel returns the channel in which the publisher publishes messages
-func (sub *subscriber) Messages() <-chan Message {
+// Messages returns the channel in which the publisher publishes messages
+func (sub *Subscriber) Messages() <-chan Message {
 	return sub.messages
 }
 
-// Unsubscribe removes this subscriber from its publisher's list
-func (sub *subscriber) Unsubscribe() {
+// Unsubscribe removes this Subscriber from its publisher's list
+func (sub *Subscriber) Unsubscribe() {
 	for {
 		select {
-		case sub.unSubscribe <- sub:
+		case sub.unsubscribe <- sub:
 			return
 		case _, ok := <-sub.messages:
 			if !ok {
@@ -37,31 +31,26 @@ func (sub *subscriber) Unsubscribe() {
 	}
 }
 
-func (sub *subscriber) Done() {
+// Done signals that this Subscriber goroutine has terminated
+func (sub *Subscriber) Done() {
 	log.Println("Subscriber Done")
 	sub.Unsubscribe()
 	sub.done.Done()
 }
 
 // Publisher publishes messages to subscribers
-type Publisher interface {
-	NewSubscriber() (Subscriber, bool)
-
-	Done() <-chan struct{}
-}
-
-type publisher struct {
+type Publisher struct {
 	done         <-chan struct{}
-	newSub       chan *subscriber
-	unSubRequest chan *subscriber
+	newSub       chan *Subscriber
+	unsubRequest chan *Subscriber
 	allDone      *sync.WaitGroup
 }
 
 // NewSubscriber creates a new Subscriber which is subscribed to the Publisher
-func (p *publisher) NewSubscriber() (Subscriber, bool) {
-	s := &subscriber{
+func (p *Publisher) NewSubscriber() (*Subscriber, bool) {
+	s := &Subscriber{
 		messages:    make(chan Message),
-		unSubscribe: p.unSubRequest,
+		unsubscribe: p.unsubRequest,
 		done:        p.allDone}
 
 	select {
@@ -72,18 +61,19 @@ func (p *publisher) NewSubscriber() (Subscriber, bool) {
 	}
 }
 
-func (p *publisher) Done() <-chan struct{} {
+// Done returns a channel that is closed when the publisher terminates
+func (p *Publisher) Done() <-chan struct{} {
 	return p.done
 }
 
 // PublishMessages starts published messages received from messageSrc
-func PublishMessages(messageSrc <-chan Message, pubDone *sync.WaitGroup) Publisher {
+func PublishMessages(messageSrc <-chan Message, pubDone *sync.WaitGroup) *Publisher {
 	pubDone.Add(1)
-	subs := make(map[Subscriber]chan<- Message)
+	subs := make(map[*Subscriber]chan<- Message)
 
 	done := make(chan struct{})
-	newSub := make(chan *subscriber)
-	unSubRequest := make(chan *subscriber)
+	newSub := make(chan *Subscriber)
+	unsubRequest := make(chan *Subscriber)
 
 	go func() {
 		defer pubDone.Done()
@@ -108,7 +98,7 @@ func PublishMessages(messageSrc <-chan Message, pubDone *sync.WaitGroup) Publish
 				log.Println("New Subscriber")
 				pubDone.Add(1)
 				subs[sub] = sub.messages
-			case sub := <-unSubRequest:
+			case sub := <-unsubRequest:
 				log.Println("Subscriber Unsubscribing")
 				close(sub.messages)
 				delete(subs, sub)
@@ -116,9 +106,9 @@ func PublishMessages(messageSrc <-chan Message, pubDone *sync.WaitGroup) Publish
 		}
 	}()
 
-	return &publisher{
+	return &Publisher{
 		done:         done,
 		newSub:       newSub,
-		unSubRequest: unSubRequest,
+		unsubRequest: unsubRequest,
 		allDone:      pubDone}
 }
