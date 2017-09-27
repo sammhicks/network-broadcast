@@ -10,7 +10,16 @@
 </head>
 
 <body>
-    <ul id="events"></ul>
+    <form action="/message" method="post">
+        <label>Name: <input type="text" name="name"/></label>
+        <label>Message: <input type="text" name="message"/></label>
+        <input type="submit">
+    </form>
+    <div>
+        <ul id="events"></ul>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+        crossorigin="anonymous"></script>
     <script src="index.js"></script>
 </body>
 
